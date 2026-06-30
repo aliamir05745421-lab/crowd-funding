@@ -12,7 +12,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: ['https://fundbridge.space', 'http://localhost:5000', 'https://crowd-funding-9pug.onrender.com'],
+  origin: ['https://hopefunding.netlify.app', 'http://localhost:5000'],
   credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));
@@ -153,7 +153,7 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    domain: 'fundbridge.space',
+    domain: 'hopefunding.netlify.app',
     contractAddress: '0xf3C017BdCCa5f9178Aed2f5B1EaDab76373AF04B'
   });
 });
@@ -578,10 +578,10 @@ app.post('/api/contract/clear', async (req, res) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌐 Website: https://fundbridge.space`);
-  console.log(`🔐 Admin: https://fundbridge.space/admin.html`);
-  console.log(`📋 Privacy: https://fundbridge.space/privacy.html`);
-  console.log(`📋 Terms: https://fundbridge.space/terms.html`);
-  console.log(`💚 Health: https://fundbridge.space/api/health`);
+  console.log(`🌐 Website: https://hopefunding.netlify.app`);
+  console.log(`🔐 Admin: https://hopefunding.netlify.app/admin.html`);
+  console.log(`📋 Privacy: https://hopefunding.netlify.app/privacy.html`);
+  console.log(`📋 Terms: https://hopefunding.netlify.app/terms.html`);
+  console.log(`💚 Health: https://hopefunding.netlify.app/api/health`);
   console.log(`📦 Contract: 0xf3C017BdCCa5f9178Aed2f5B1EaDab76373AF04B`);
 });
