@@ -1,7 +1,7 @@
 {
-  "name": "crowdfunding-platform",
+  "name": "hopefunding-platform",
   "version": "1.0.0",
-  "description": "Crowdfunding Platform with Multi-Gateway Payments",
+  "description": "Crowdfunding Platform - HopeFunding",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
