@@ -12,7 +12,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: ['https://fundbridge.space', 'http://localhost:5000', 'https://crowd-funding-9pug.onrender.com'],
+  origin: ['https://fundbridge.space', 'http://localhost:5000', 'https://crowd-funding-9pug.onrender.com', 'http://localhost:3000'],
   credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));
@@ -374,7 +374,10 @@ app.post('/api/payment/intent', async (req, res) => {
       return res.status(400).json({ error: 'Campaign is not active' });
     }
 
-    const cryptoAmount = (amount / 0.7).toFixed(6);
+    // Calculate crypto amount with a realistic MATIC/USD rate
+    // In production, you should use a price oracle or API
+    const maticRate = 0.7; // 1 MATIC = $0.70 USD
+    const cryptoAmount = (amount / maticRate).toFixed(6);
     const transactionId = uuidv4();
 
     const transaction = await Transaction.create({
@@ -393,9 +396,14 @@ app.post('/api/payment/intent', async (req, res) => {
     let paymentUrl = '';
     let orderId = `txn_${Date.now()}`;
 
+    // Determine the base URL based on environment
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://fundbridge.space' 
+      : 'http://localhost:5000';
+
     switch (gateway) {
       case 'Transak':
-        paymentUrl = `https://global.transak.com/?apiKey=${process.env.TRANSFER_API_KEY}&cryptoCurrency=MATIC&cryptoAmount=${cryptoAmount}&fiatCurrency=USD&fiatAmount=${amount}&network=polygon&walletAddress=${campaign.creatorWallet}&orderId=${orderId}`;
+        paymentUrl = `https://global.transak.com/?apiKey=${process.env.TRANSFER_API_KEY}&cryptoCurrency=MATIC&cryptoAmount=${cryptoAmount}&fiatCurrency=USD&fiatAmount=${amount}&network=polygon&walletAddress=${campaign.creatorWallet}&orderId=${orderId}&redirectURL=${baseUrl}/payment-success?orderId=${orderId}`;
         break;
       case 'MoonPay':
         paymentUrl = `https://buy.moonpay.com/?apiKey=${process.env.MOONPAY_API_KEY}&currencyCode=MATIC&baseCurrencyAmount=${amount}&baseCurrencyCode=USD&walletAddress=${campaign.creatorWallet}&externalTransactionId=${orderId}`;
@@ -417,20 +425,39 @@ app.post('/api/payment/intent', async (req, res) => {
 
   } catch (error) {
     console.error('Payment intent error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error: ' + error.message });
   }
 });
 
+// Webhook endpoint for payment confirmation
 app.post('/api/webhook/payment', async (req, res) => {
   try {
-    const { transactionId, status, gatewayTransactionId } = req.body;
+    const { transactionId, status, gatewayTransactionId, amount, donorName } = req.body;
 
-    const transaction = await Transaction.findOne({ 
+    // Find the transaction
+    let transaction = await Transaction.findOne({ 
       gatewayTransactionId: transactionId || gatewayTransactionId 
     });
 
     if (!transaction) {
-      return res.status(404).json({ error: 'Transaction not found' });
+      // If transaction not found, create a new one
+      const campaign = await Campaign.findOne({ creatorWallet: req.body.walletAddress });
+      if (campaign) {
+        transaction = await Transaction.create({
+          campaignId: campaign._id,
+          amount: amount || 0,
+          cryptoAmount: (amount || 0) / 0.7,
+          cryptoCurrency: 'MATIC',
+          donorName: donorName || 'Anonymous',
+          donorEmail: '',
+          gateway: 'Transak',
+          gatewayTransactionId: transactionId || gatewayTransactionId,
+          walletAddress: req.body.walletAddress,
+          status: status === 'COMPLETED' || status === 'SUCCESS' ? 'Completed' : 'Failed'
+        });
+      } else {
+        return res.status(404).json({ error: 'Transaction or campaign not found' });
+      }
     }
 
     if (status === 'COMPLETED' || status === 'SUCCESS') {
@@ -465,6 +492,43 @@ app.post('/api/webhook/payment', async (req, res) => {
   }
 });
 
+// Payment success redirect
+app.get('/payment-success', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Payment Successful - FundBridge</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <script src="https://cdn.tailwindcss.com"></script>
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        .gradient-bg {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+      </style>
+    </head>
+    <body>
+      <div class="min-h-screen gradient-bg flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-8 text-center shadow-2xl">
+          <div class="text-6xl mb-4">🎉</div>
+          <h1 class="text-3xl font-bold text-gray-800 mb-2">Payment Successful!</h1>
+          <p class="text-gray-600 mb-4">Thank you for your donation. Your support means the world to us.</p>
+          <div class="bg-green-50 p-4 rounded-lg mb-6">
+            <p class="text-green-700 font-semibold">Your transaction has been confirmed.</p>
+          </div>
+          <a href="/" class="inline-block bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-8 py-3 rounded-full font-semibold hover:shadow-lg transition-all duration-200">
+            <i class="fas fa-home mr-2"></i>Return to Home
+          </a>
+          <p class="text-sm text-gray-500 mt-4">You can close this window now.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
 app.get('/api/campaign/:id/donations', async (req, res) => {
   try {
     const campaign = await Campaign.findById(req.params.id);
@@ -484,7 +548,7 @@ app.get('/api/campaign/:id/donations', async (req, res) => {
 app.get('/api/contract/info', async (req, res) => {
   try {
     res.json({
-      address: '0xf3C017BdCCa5f9178Aed2f5B1EaDab76373AF04B',
+      address: process.env.CONTRACT_ADDRESS || '0xf3C017BdCCa5f9178Aed2f5B1EaDab76373AF04B',
       network: 'Polygon',
       chainId: 137
     });
@@ -504,6 +568,14 @@ app.post('/api/contract/lock', async (req, res) => {
       return res.status(404).json({ error: 'Campaign not found' });
     }
 
+    // Check if private key is set (not the default)
+    if (!process.env.PRIVATE_KEY || process.env.PRIVATE_KEY === '0x0000000000000000000000000000000000000000000000000000000000000000') {
+      return res.status(400).json({ 
+        error: 'Contract locking is not configured. Please set PRIVATE_KEY in .env file.',
+        fallback: true
+      });
+    }
+
     const provider = new ethers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
     const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
     
@@ -513,7 +585,7 @@ app.post('/api/contract/lock', async (req, res) => {
     ];
     
     const contract = new ethers.Contract(
-      '0xf3C017BdCCa5f9178Aed2f5B1EaDab76373AF04B',
+      process.env.CONTRACT_ADDRESS || '0xf3C017BdCCa5f9178Aed2f5B1EaDab76373AF04B',
       contractABI,
       wallet
     );
@@ -528,11 +600,11 @@ app.post('/api/contract/lock', async (req, res) => {
     res.json({
       message: 'Funds locked successfully',
       transactionHash: tx.hash,
-      contractAddress: '0xf3C017BdCCa5f9178Aed2f5B1EaDab76373AF04B'
+      contractAddress: process.env.CONTRACT_ADDRESS || '0xf3C017BdCCa5f9178Aed2f5B1EaDab76373AF04B'
     });
   } catch (error) {
     console.error('Lock funds error:', error);
-    res.status(500).json({ error: 'Failed to lock funds' });
+    res.status(500).json({ error: 'Failed to lock funds: ' + error.message });
   }
 });
 
@@ -546,6 +618,14 @@ app.post('/api/contract/clear', async (req, res) => {
       return res.status(404).json({ error: 'Campaign not found' });
     }
 
+    // Check if private key is set (not the default)
+    if (!process.env.PRIVATE_KEY || process.env.PRIVATE_KEY === '0x0000000000000000000000000000000000000000000000000000000000000000') {
+      return res.status(400).json({ 
+        error: 'Contract clearing is not configured. Please set PRIVATE_KEY in .env file.',
+        fallback: true
+      });
+    }
+
     const provider = new ethers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
     const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
     
@@ -555,7 +635,7 @@ app.post('/api/contract/clear', async (req, res) => {
     ];
     
     const contract = new ethers.Contract(
-      '0xf3C017BdCCa5f9178Aed2f5B1EaDab76373AF04B',
+      process.env.CONTRACT_ADDRESS || '0xf3C017BdCCa5f9178Aed2f5B1EaDab76373AF04B',
       contractABI,
       wallet
     );
@@ -565,11 +645,11 @@ app.post('/api/contract/clear', async (req, res) => {
     res.json({
       message: 'Funds cleared successfully',
       transactionHash: tx.hash,
-      contractAddress: '0xf3C017BdCCa5f9178Aed2f5B1EaDab76373AF04B'
+      contractAddress: process.env.CONTRACT_ADDRESS || '0xf3C017BdCCa5f9178Aed2f5B1EaDab76373AF04B'
     });
   } catch (error) {
     console.error('Clear funds error:', error);
-    res.status(500).json({ error: 'Failed to clear funds' });
+    res.status(500).json({ error: 'Failed to clear funds: ' + error.message });
   }
 });
 
@@ -583,5 +663,5 @@ app.listen(PORT, () => {
   console.log(`📋 Privacy: https://fundbridge.space/privacy.html`);
   console.log(`📋 Terms: https://fundbridge.space/terms.html`);
   console.log(`💚 Health: https://fundbridge.space/api/health`);
-  console.log(`📦 Contract: 0xf3C017BdCCa5f9178Aed2f5B1EaDab76373AF04B`);
+  console.log(`📦 Contract: ${process.env.CONTRACT_ADDRESS || '0xf3C017BdCCa5f9178Aed2f5B1EaDab76373AF04B'}`);
 });
