@@ -160,9 +160,10 @@ app.post('/api/transak/widget-url', async (req, res) => {
     const cryptoAmount = (amount / maticRate).toFixed(6);
     const orderIdFinal = orderId || `donation_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
-    // Build parameters
+    // ========== PARAMS WITH referrerDomain ==========
     const params = {
       apiKey: process.env.TRANSAK_API_KEY,
+      referrerDomain: 'fundbridge.space',  
       cryptoCurrency: 'MATIC',
       cryptoAmount: cryptoAmount,
       fiatCurrency: 'USD',
@@ -175,6 +176,7 @@ app.post('/api/transak/widget-url', async (req, res) => {
       hideMenu: 'true',
       isAutoPayment: 'true'
     };
+    // ============================================
 
     // Add user data if provided
     if (donorName || donorEmail) {
