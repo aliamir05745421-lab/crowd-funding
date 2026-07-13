@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - FundBridge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-hover { transition: all 0.3s ease; }
+        .card-hover:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .toast {
+            position: fixed; bottom: 20px; right: 20px; padding: 16px 24px;
+            border-radius: 12px; color: white; font-weight: 500; z-index: 9999;
+            animation: slideIn 0.3s ease-out; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        .toast-success { background: #10b981; }
+        .toast-error { background: #ef4444; }
+        .toast-info { background: #3b82f6; }
+        .toast-warning { background: #f59e0b; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        .loading-spinner { border: 3px solid #f3f3f3; border-top: 3px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .status-badge { padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-active { background: #d1fae5; color: #065f46; }
+        .status-completed { background: #dbeafe; color: #1e40af; }
+        .status-rejected { background: #fee2e2; color: #991b1b; }
+        .btn-danger { background: #ef4444; color: white; padding: 4px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; transition: all 0.2s; }
+        .btn-danger:hover { background: #dc2626; }
+    </style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="login-screen" class="min-h-screen gradient-bg flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-8 shadow-2xl">
+        <div class="text-center mb-8">
+            <i class="fas fa-shield-alt text-5xl text-purple-600 mb-4"></i>
+            <h1 class="text-3xl font-bold text-gray-800">Admin Login</h1>
+            <p class="text-gray-600 mt-2">Secure access to campaign management</p>
+        </div>
+        <form id="login-form" class="space-y-4">
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" id="admin-email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">Password</label><input type="password" id="admin-password" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"></div>
+            <button type="submit" class="w-full gradient-bg text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all duration-200"><i class="fas fa-sign-in-alt mr-2"></i>Login</button>
+        </form>
+    </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard" class="hidden min-h-screen bg-gray-50">
+    <nav class="bg-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <a href="/" class="flex items-center">
+                        <i class="fas fa-hand-holding-heart text-purple-600 text-2xl mr-2"></i>
+                        <span class="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">FundBridge</span>
+                    </a>
+                    <span class="ml-3 text-sm bg-purple-100 text-purple-600 px-3 py-1 rounded-full">Admin</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="showSection('pending')" class="px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors" id="nav-pending"><i class="fas fa-clock mr-2"></i>Pending</button>
+                    <button onclick="showSection('all')" class="px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors" id="nav-all"><i class="fas fa-list mr-2"></i>All</button>
+                    <button onclick="logout()" class="text-red-600 hover:text-red-700 transition-colors"><i class="fas fa-sign-out-alt text-xl"></i></button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 py-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div class="bg-white rounded-xl p-6 shadow-sm card-hover"><div class="flex justify-between items-center"><div><p class="text-sm text-gray-500">Total</p><p class="text-2xl font-bold text-gray-800" id="stat-total">0</p></div><i class="fas fa-file-alt text-3xl text-purple-400"></i></div></div>
+            <div class="bg-white rounded-xl p-6 shadow-sm card-hover"><div class="flex justify-between items-center"><div><p class="text-sm text-gray-500">Pending</p><p class="text-2xl font-bold text-yellow-600" id="stat-pending">0</p></div><i class="fas fa-clock text-3xl text-yellow-400"></i></div></div>
+            <div class="bg-white rounded-xl p-6 shadow-sm card-hover"><div class="flex justify-between items-center"><div><p class="text-sm text-gray-500">Active</p><p class="text-2xl font-bold text-green-600" id="stat-active">0</p></div><i class="fas fa-check-circle text-3xl text-green-400"></i></div></div>
+            <div class="bg-white rounded-xl p-6 shadow-sm card-hover"><div class="flex justify-between items-center"><div><p class="text-sm text-gray-500">Raised</p><p class="text-2xl font-bold text-purple-600" id="stat-raised">$0</p></div><i class="fas fa-dollar-sign text-3xl text-purple-400"></i></div></div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 pb-12">
+        <div id="campaigns-container"><div class="text-center py-12"><div class="loading-spinner mx-auto"></div><p class="mt-4 text-gray-600">Loading...</p></div></div>
+    </div>
+</div>
+
+<script>
+const API_URL = 'https://crowd-funding-9pug.onrender.com/api';
+let authToken = null;
+let currentSection = 'pending';
+
+function showToast(msg, type='info') {
+    const t = document.createElement('div');
+    t.className = `toast toast-${type}`;
+    t.innerHTML = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 5000);
+}
+
+// ===== LOGIN =====
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+        const res = await fetch(`${API_URL}/admin/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: document.getElementById('admin-email').value, password: document.getElementById('admin-password').value })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Login failed');
+        authToken = data.token;
+        localStorage.setItem('adminToken', authToken);
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('dashboard').classList.remove('hidden');
+        showToast('✅ Welcome Admin!', 'success');
+        loadPending();
+    } catch (e) { showToast('❌ ' + e.message, 'error'); }
+});
+
+// ===== AUTO LOGIN =====
+const saved = localStorage.getItem('adminToken');
+if (saved) {
+    authToken = saved;
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('dashboard').classList.remove('hidden');
+    loadPending();
+}
+
+// ===== LOGOUT =====
+function logout() {
+    authToken = null;
+    localStorage.removeItem('adminToken');
+    document.getElementById('dashboard').classList.add('hidden');
+    document.getElementById('login-screen').classList.remove('hidden');
+    document.getElementById('login-form').reset();
+    showToast('Logged out', 'info');
+}
+
+// ===== NAVIGATION =====
+function showSection(section) {
+    currentSection = section;
+    document.querySelectorAll('#nav-pending, #nav-all').forEach(el => el.classList.remove('bg-purple-100', 'text-purple-600'));
+    document.getElementById(`nav-${section}`).classList.add('bg-purple-100', 'text-purple-600');
+    section === 'pending' ? loadPending() : loadAll();
+}
+
+// ===== LOAD PENDING =====
+async function loadPending() {
+    const container = document.getElementById('campaigns-container');
+    container.innerHTML = '<div class="text-center py-12"><div class="loading-spinner mx-auto"></div><p class="mt-4 text-gray-600">Loading...</p></div>';
+    try {
+        const res = await fetch(`${API_URL}/admin/pending-campaigns`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+        if (res.status === 401) { logout(); return; }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        renderCampaigns(data, 'Pending');
+    } catch (e) {
+        container.innerHTML = `<div class="text-center py-12"><i class="fas fa-exclamation-circle text-6xl text-red-300 mb-4"></i><p class="text-xl text-gray-600">Error: ${e.message}</p><button onclick="loadPending()" class="mt-4 bg-purple-600 text-white px-6 py-2 rounded-full hover:bg-purple-700">Retry</button></div>`;
+    }
+}
+
+// ===== LOAD ALL =====
+async function loadAll() {
+    const container = document.getElementById('campaigns-container');
+    container.innerHTML = '<div class="text-center py-12"><div class="loading-spinner mx-auto"></div><p class="mt-4 text-gray-600">Loading...</p></div>';
+    try {
+        const res = await fetch(`${API_URL}/admin/all-campaigns`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+        if (res.status === 401) { logout(); return; }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        renderCampaigns(data, 'All');
+    } catch (e) {
+        container.innerHTML = `<div class="text-center py-12"><i class="fas fa-exclamation-circle text-6xl text-red-300 mb-4"></i><p class="text-xl text-gray-600">Error: ${e.message}</p><button onclick="loadAll()" class="mt-4 bg-purple-600 text-white px-6 py-2 rounded-full hover:bg-purple-700">Retry</button></div>`;
+    }
+}
+
+// ===== RENDER =====
+function renderCampaigns(campaigns, type) {
+    const container = document.getElementById('campaigns-container');
+    const total = campaigns.length;
+    const pending = campaigns.filter(c => c.status === 'Pending').length;
+    const active = campaigns.filter(c => c.status === 'Active').length;
+    const raised = campaigns.reduce((s, c) => s + c.raisedAmount, 0);
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-pending').textContent = pending;
+    document.getElementById('stat-active').textContent = active;
+    document.getElementById('stat-raised').textContent = `$${raised.toLocaleString()}`;
+
+    if (campaigns.length === 0) {
+        container.innerHTML = `<div class="text-center py-12 bg-white rounded-xl shadow-sm"><i class="fas fa-inbox text-6xl text-gray-300 mb-4"></i><p class="text-xl text-gray-500">No ${type.toLowerCase()} campaigns</p></div>`;
+        return;
+    }
+
+    container.innerHTML = campaigns.map(c => {
+        const progress = Math.min((c.raisedAmount / c.goalAmount) * 100, 100);
+        const statusClass = `status-${c.status.toLowerCase()}`;
+        return `
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden card-hover mb-4">
+            <div class="flex flex-col md:flex-row">
+                <img src="${c.imageUrl || 'https://via.placeholder.com/300x200'}" class="w-full md:w-48 h-48 object-cover" onerror="this.src='https://via.placeholder.com/300x200'">
+                <div class="p-6 flex-1">
+                    <div class="flex justify-between items-start mb-2">
+                        <div><h3 class="text-lg font-bold text-gray-800">${c.title}</h3><p class="text-sm text-gray-500">by ${c.creatorName}</p></div>
+                        <span class="status-badge ${statusClass}">${c.status}</span>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-3 line-clamp-2">${c.description}</p>
+                    <div class="mb-3">
+                        <div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-gradient-to-r from-purple-600 to-indigo-600 h-2 rounded-full" style="width: ${Math.min(progress,100)}%"></div></div>
+                        <div class="flex justify-between text-sm mt-1"><span class="font-semibold">$${c.raisedAmount.toLocaleString()}</span><span class="text-gray-500">${progress.toFixed(0)}% of $${c.goalAmount.toLocaleString()}</span></div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <div class="text-sm text-gray-500"><i class="far fa-calendar-alt mr-1"></i>${new Date(c.createdAt).toLocaleDateString()} <span class="mx-2">•</span> <i class="fas fa-wallet mr-1"></i>${c.creatorWallet.slice(0,6)}...${c.creatorWallet.slice(-4)}</div>
+                        <div class="space-x-2">
+                            ${c.status === 'Pending' ? `
+                                <button onclick="approveCampaign('${c._id}')" class="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-600"><i class="fas fa-check mr-1"></i>Approve</button>
+                                <button onclick="rejectCampaign('${c._id}')" class="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-600"><i class="fas fa-times mr-1"></i>Reject</button>
+                            ` : `<span class="text-sm text-gray-500"><i class="fas fa-info-circle mr-1"></i>${c.donations ? c.donations.length : 0} donations</span>`}
+                            <button onclick="deleteCampaign('${c._id}')" class="btn-danger"><i class="fas fa-trash mr-1"></i>Delete</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ===== APPROVE =====
+async function approveCampaign(id) {
+    if (!confirm('Approve this campaign?')) return;
+    try {
+        const res = await fetch(`${API_URL}/admin/approve-campaign/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        showToast('✅ Approved!', 'success');
+        currentSection === 'pending' ? loadPending() : loadAll();
+    } catch (e) { showToast('❌ ' + e.message, 'error'); }
+}
+
+// ===== REJECT =====
+async function rejectCampaign(id) {
+    if (!confirm('Reject this campaign?')) return;
+    try {
+        const res = await fetch(`${API_URL}/admin/reject-campaign/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        showToast('✅ Rejected', 'info');
+        currentSection === 'pending' ? loadPending() : loadAll();
+    } catch (e) { showToast('❌ ' + e.message, 'error'); }
+}
+
+// ===== DELETE =====
+async function deleteCampaign(id) {
+    if (!confirm('⚠️ Delete this campaign permanently?')) return;
+    try {
+        const res = await fetch(`${API_URL}/admin/delete-campaign/${id}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        showToast('🗑️ Deleted!', 'warning');
+        currentSection === 'pending' ? loadPending() : loadAll();
+    } catch (e) { showToast('❌ ' + e.message, 'error'); }
+}
+
+// ===== AUTO REFRESH =====
+setInterval(() => {
+    if (authToken) {
+        currentSection === 'pending' ? loadPending() : loadAll();
+    }
+}, 30000);
+</script>
+</body>
+</html>

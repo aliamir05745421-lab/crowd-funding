@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FundBridge - Crowdfunding Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-hover { transition: all 0.3s ease; }
+        .card-hover:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .gateway-btn { transition: all 0.2s ease; border: 2px solid transparent; cursor: pointer; }
+        .gateway-btn:hover { transform: scale(1.05); }
+        .gateway-btn.active { border-color: #667eea; background: #eef2ff; }
+        .toast {
+            position: fixed; bottom: 20px; right: 20px; padding: 16px 24px;
+            border-radius: 12px; color: white; font-weight: 500; z-index: 9999;
+            animation: slideIn 0.3s ease-out; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            max-width: 90%;
+        }
+        .toast-success { background: #10b981; }
+        .toast-error { background: #ef4444; }
+        .toast-info { background: #3b82f6; }
+        .toast-warning { background: #f59e0b; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+        .loading-spinner {
+            border: 3px solid #f3f3f3; border-top: 3px solid #667eea;
+            border-radius: 50%; width: 40px; height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .modal-overlay { backdrop-filter: blur(4px); }
+        .progress-bar { transition: width 0.8s ease; }
+        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        .live-indicator { animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        .campaign-card { max-width: 900px; margin: 0 auto 24px auto; }
+        .campaign-card .campaign-image { width: 200px; min-height: 200px; object-fit: cover; flex-shrink: 0; }
+        @media (max-width: 640px) { .campaign-card .campaign-image { width: 100%; height: 200px; } }
+        .quick-amount.active { border-color: #667eea; background: #eef2ff; }
+    </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="bg-white shadow-lg fixed w-full z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center h-16">
+            <div class="flex items-center">
+                <a href="/" class="flex items-center">
+                    <i class="fas fa-hand-holding-heart text-purple-600 text-2xl mr-2"></i>
+                    <span class="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">FundBridge</span>
+                </a>
+                <span class="ml-3 text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full live-indicator">
+                    <i class="fas fa-circle text-green-500 text-[8px] mr-1"></i>Live
+                </span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <a href="/privacy.html" class="text-gray-600 hover:text-purple-600 transition-colors text-sm hidden md:inline">Privacy</a>
+                <a href="/terms.html" class="text-gray-600 hover:text-purple-600 transition-colors text-sm hidden md:inline">Terms</a>
+                <button onclick="document.getElementById('create-modal').classList.remove('hidden')" class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-2 rounded-full hover:shadow-lg transition-all duration-200 font-semibold text-sm">
+                    <i class="fas fa-plus mr-2"></i>Start Campaign
+                </button>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- Hero -->
+<section class="gradient-bg pt-24 pb-16 px-4">
+    <div class="max-w-4xl mx-auto text-center text-white">
+        <h1 class="text-4xl md:text-6xl font-bold mb-6">Empowering Dreams Through <span class="underline decoration-pink-400">Community</span></h1>
+        <p class="text-xl md:text-2xl mb-8 opacity-90">Launch your fundraising campaign and receive support from backers worldwide.</p>
+        <div class="flex flex-wrap justify-center gap-4">
+            <button onclick="document.getElementById('create-modal').classList.remove('hidden')" class="bg-white text-purple-600 px-8 py-4 rounded-full font-bold hover:shadow-2xl transition-all duration-200 text-lg">
+                <i class="fas fa-rocket mr-2"></i>Start Campaign
+            </button>
+            <button onclick="document.getElementById('campaigns-section').scrollIntoView({behavior:'smooth'})" class="bg-transparent border-2 border-white px-8 py-4 rounded-full font-bold hover:bg-white hover:text-purple-600 transition-all duration-200 text-lg">
+                <i class="fas fa-search mr-2"></i>Explore
+            </button>
+        </div>
+    </div>
+</section>
+
+<!-- Stats -->
+<section class="py-12 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div class="text-center bg-white p-4 rounded-xl shadow-sm"><div class="text-3xl font-bold text-purple-600" id="total-raised">$0</div><div class="text-gray-600 text-sm">Total Raised</div></div>
+        <div class="text-center bg-white p-4 rounded-xl shadow-sm"><div class="text-3xl font-bold text-purple-600" id="total-campaigns">0</div><div class="text-gray-600 text-sm">Active Campaigns</div></div>
+        <div class="text-center bg-white p-4 rounded-xl shadow-sm"><div class="text-3xl font-bold text-purple-600" id="total-donors">0</div><div class="text-gray-600 text-sm">Donors</div></div>
+        <div class="text-center bg-white p-4 rounded-xl shadow-sm"><div class="text-3xl font-bold text-purple-600" id="success-rate">0%</div><div class="text-gray-600 text-sm">Success Rate</div></div>
+    </div>
+</section>
+
+<!-- Campaigns -->
+<section id="campaigns-section" class="py-16 px-4 bg-gray-50">
+    <div class="max-w-4xl mx-auto">
+        <div class="text-center mb-12">
+            <h2 class="text-4xl font-bold text-gray-800 mb-4">Active Campaigns</h2>
+            <p class="text-xl text-gray-600">Support causes that matter to you</p>
+            <div class="mt-4 flex justify-center gap-2 flex-wrap">
+                <button onclick="filterCampaigns('all')" class="filter-btn px-4 py-2 rounded-full bg-purple-600 text-white text-sm font-semibold" data-filter="all">All</button>
+                <button onclick="filterCampaigns('Medical')" class="filter-btn px-4 py-2 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm font-semibold" data-filter="Medical">Medical</button>
+                <button onclick="filterCampaigns('Education')" class="filter-btn px-4 py-2 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm font-semibold" data-filter="Education">Education</button>
+                <button onclick="filterCampaigns('Business')" class="filter-btn px-4 py-2 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm font-semibold" data-filter="Business">Business</button>
+                <button onclick="filterCampaigns('Charity')" class="filter-btn px-4 py-2 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm font-semibold" data-filter="Charity">Charity</button>
+                <button onclick="filterCampaigns('Emergency')" class="filter-btn px-4 py-2 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm font-semibold" data-filter="Emergency">Emergency</button>
+            </div>
+            <div id="api-status" class="mt-2 text-sm"></div>
+        </div>
+        <div id="campaigns-container"></div>
+        <div id="loading-state" class="text-center py-12"><div class="loading-spinner mx-auto"></div><p class="mt-4 text-gray-600">Loading campaigns...</p></div>
+    </div>
+</section>
+
+<!-- Create Campaign Modal -->
+<div id="create-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden overflow-y-auto modal-overlay">
+    <div class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold text-gray-800">Start Your Campaign</h3>
+                <button onclick="document.getElementById('create-modal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700 text-2xl"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="create-form" class="space-y-4">
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Title *</label><input type="text" id="c-title" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+                    <select id="c-category" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                        <option value="Medical">Medical</option><option value="Education">Education</option>
+                        <option value="Business">Business</option><option value="Charity">Charity</option>
+                        <option value="Emergency">Emergency</option><option value="Other">Other</option>
+                    </select>
+                </div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Description *</label><textarea id="c-description" rows="4" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"></textarea></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Goal (USD) *</label><input type="number" id="c-goal" min="10" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">End Date *</label><input type="date" id="c-enddate" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"></div>
+                </div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Image URL *</label><input type="url" id="c-image" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="https://example.com/image.jpg"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Your Name *</label><input type="text" id="c-name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Your Email *</label><input type="email" id="c-email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Wallet (Polygon) *</label><input type="text" id="c-wallet" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="0x..."></div>
+                <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all duration-200">
+                    <i class="fas fa-paper-plane mr-2"></i>Submit for Approval
+                </button>
+            </form>
+            <p class="text-sm text-gray-500 mt-4 text-center"><i class="fas fa-info-circle mr-1"></i>Campaigns reviewed before going live</p>
+        </div>
+    </div>
+</div>
+
+<!-- Donation Modal -->
+<div id="donation-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden overflow-y-auto modal-overlay">
+    <div class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-8">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold text-gray-800">Donate</h3>
+                <button onclick="closeDonationModal()" class="text-gray-500 hover:text-gray-700 text-2xl"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="donation-info" class="mb-4 p-4 bg-gray-50 rounded-lg">
+                <p class="font-semibold text-gray-800" id="d-title">Campaign Title</p>
+                <p class="text-sm text-gray-600">Goal: <span id="d-goal">$0</span></p>
+                <p class="text-sm text-gray-600">Raised: <span id="d-raised">$0</span></p>
+            </div>
+            <form id="donation-form">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Amount (USD) *</label>
+                    <div class="flex gap-2 mb-2 flex-wrap">
+                        <button type="button" onclick="setAmount(10)" class="quick-amount px-3 py-1 border border-gray-300 rounded-lg text-sm hover:border-purple-500 hover:bg-purple-50">$10</button>
+                        <button type="button" onclick="setAmount(25)" class="quick-amount px-3 py-1 border border-gray-300 rounded-lg text-sm hover:border-purple-500 hover:bg-purple-50">$25</button>
+                        <button type="button" onclick="setAmount(50)" class="quick-amount px-3 py-1 border border-gray-300 rounded-lg text-sm hover:border-purple-500 hover:bg-purple-50">$50</button>
+                        <button type="button" onclick="setAmount(100)" class="quick-amount px-3 py-1 border border-gray-300 rounded-lg text-sm hover:border-purple-500 hover:bg-purple-50">$100</button>
+                        <button type="button" onclick="setAmount(250)" class="quick-amount px-3 py-1 border border-gray-300 rounded-lg text-sm hover:border-purple-500 hover:bg-purple-50">$250</button>
+                    </div>
+                    <input type="number" id="d-amount" min="1" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="Enter amount">
+                </div>
+                <div class="mb-4"><label class="block text-sm font-medium text-gray-700 mb-1">Your Name</label><input type="text" id="d-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="Anonymous"></div>
+                <div class="mb-4"><label class="block text-sm font-medium text-gray-700 mb-1">Your Email</label><input type="email" id="d-email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="email@example.com"></div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-3">Payment Gateway *</label>
+                    <div class="grid grid-cols-3 gap-3">
+                        <button type="button" onclick="selectGateway('Transak')" class="gateway-btn p-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-center active" id="gw-transak">
+                            <i class="fas fa-building text-purple-600 text-xl mb-1"></i><div class="text-xs font-semibold">Transak</div>
+                        </button>
+                        <button type="button" onclick="selectGateway('MoonPay')" class="gateway-btn p-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-center" id="gw-moonpay">
+                            <i class="fas fa-moon text-purple-600 text-xl mb-1"></i><div class="text-xs font-semibold">MoonPay</div>
+                        </button>
+                        <button type="button" onclick="selectGateway('Ramp')" class="gateway-btn p-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-center" id="gw-ramp">
+                            <i class="fas fa-rocket text-purple-600 text-xl mb-1"></i><div class="text-xs font-semibold">Ramp</div>
+                        </button>
+                    </div>
+                </div>
+                <button type="submit" id="donate-btn" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all duration-200">
+                    <i class="fas fa-heart mr-2"></i>Donate Now
+                </button>
+            </form>
+            <p class="text-xs text-gray-500 mt-4 text-center"><i class="fas fa-lock mr-1"></i>Secure payment by <span id="selected-gw">Transak</span></p>
+        </div>
+    </div>
+</div>
+
+<!-- Footer -->
+<footer class="bg-gray-800 text-white py-8 px-4">
+    <div class="max-w-7xl mx-auto text-center">
+        <div class="flex flex-wrap justify-center space-x-6 mb-4">
+            <a href="/" class="hover:text-purple-400">Home</a>
+            <a href="/privacy.html" class="hover:text-purple-400">Privacy</a>
+            <a href="/terms.html" class="hover:text-purple-400">Terms</a>
+        </div>
+        <p class="text-gray-400 text-sm">© 2026 FundBridge. All rights reserved.</p>
+    </div>
+</footer>
+
+<script>
+// ===== CONFIGURATION =====
+const API_URL = 'https://crowd-funding-9pug.onrender.com/api';
+
+// ===== STATE =====
+let allCampaigns = [];
+let currentFilter = 'all';
+let currentCampaignId = null;
+let currentCampaignData = null;
+let selectedGateway = 'Transak';
+let isDemo = false;
+
+// ===== DEMO DATA =====
+const DEMO_CAMPAIGNS = [
+    { _id: 'demo1', title: 'Medical Emergency Fund', category: 'Medical', description: 'Help Sarah fight cancer with urgent medical treatment.', goalAmount: 50000, raisedAmount: 34250, imageUrl: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=400&h=300&fit=crop', creatorName: 'John Doe', creatorWallet: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e', donations: [], createdAt: new Date().toISOString(), endDate: new Date(Date.now()+15*24*60*60*1000).toISOString(), status: 'Active' },
+    { _id: 'demo2', title: 'Education for Children', category: 'Education', description: 'Provide quality education to 100 underprivileged children.', goalAmount: 25000, raisedAmount: 18000, imageUrl: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=300&fit=crop', creatorName: 'Sarah Ahmed', creatorWallet: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e', donations: [], createdAt: new Date().toISOString(), endDate: new Date(Date.now()+25*24*60*60*1000).toISOString(), status: 'Active' },
+    { _id: 'demo3', title: 'Small Business Recovery', category: 'Business', description: 'Help local businesses recover from economic downturn.', goalAmount: 100000, raisedAmount: 67000, imageUrl: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400&h=300&fit=crop', creatorName: 'Ali Khan', creatorWallet: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e', donations: [], createdAt: new Date().toISOString(), endDate: new Date(Date.now()+40*24*60*60*1000).toISOString(), status: 'Active' },
+    { _id: 'demo4', title: 'Clean Water Initiative', category: 'Charity', description: 'Install water filtration systems in 50 rural villages.', goalAmount: 75000, raisedAmount: 45000, imageUrl: 'https://images.unsplash.com/photo-1548839140-29a749e1cf4d?w=400&h=300&fit=crop', creatorName: 'Fatima Noor', creatorWallet: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e', donations: [], createdAt: new Date().toISOString(), endDate: new Date(Date.now()+30*24*60*60*1000).toISOString(), status: 'Active' },
+    { _id: 'demo5', title: 'Flood Relief Emergency', category: 'Emergency', description: 'Immediate relief for flood victims including food and shelter.', goalAmount: 200000, raisedAmount: 156000, imageUrl: 'https://images.unsplash.com/photo-1547683905-f686c993aae5?w=400&h=300&fit=crop', creatorName: 'Emergency Team', creatorWallet: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e', donations: [], createdAt: new Date().toISOString(), endDate: new Date(Date.now()+10*24*60*60*1000).toISOString(), status: 'Active' }
+];
+
+// ===== TOAST =====
+function showToast(msg, type='info') {
+    const t = document.createElement('div');
+    t.className = `toast toast-${type}`;
+    t.innerHTML = msg;
+    document.body.appendChild(t);
+    setTimeout(() => { t.style.animation = 'fadeOut 0.3s'; setTimeout(() => t.remove(), 300); }, 5000);
+}
+
+// ===== GATEWAY =====
+function selectGateway(gw) {
+    selectedGateway = gw;
+    document.querySelectorAll('.gateway-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`gw-${gw.toLowerCase()}`).classList.add('active');
+    document.getElementById('selected-gw').textContent = gw;
+}
+
+// ===== SET AMOUNT =====
+function setAmount(a) {
+    document.getElementById('d-amount').value = a;
+    document.querySelectorAll('.quick-amount').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.quick-amount').forEach(b => { if (b.textContent.trim() === `$${a}`) b.classList.add('active'); });
+}
+
+// ===== LOAD CAMPAIGNS =====
+async function loadCampaigns() {
+    const container = document.getElementById('campaigns-container');
+    const loading = document.getElementById('loading-state');
+    const status = document.getElementById('api-status');
+    
+    container.innerHTML = '';
+    loading.classList.remove('hidden');
+    status.innerHTML = '';
+
+    try {
+        const res = await fetch(`${API_URL}/campaigns`);
+        if (!res.ok) throw new Error('Server error');
+        const data = await res.json();
+        if (data && data.length > 0) {
+            allCampaigns = data;
+            isDemo = false;
+            status.innerHTML = '<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>Connected to server</span>';
+        } else {
+            throw new Error('No campaigns');
+        }
+    } catch (e) {
+        console.warn('Using demo data:', e.message);
+        isDemo = true;
+        allCampaigns = DEMO_CAMPAIGNS;
+        status.innerHTML = '<span class="text-yellow-600"><i class="fas fa-exclamation-triangle mr-1"></i>Demo mode (server unavailable)</span>';
+        showToast('📡 Using demo campaigns', 'warning');
+    }
+
+    loading.classList.add('hidden');
+    if (allCampaigns.length === 0) {
+        container.innerHTML = `<div class="text-center py-12 bg-white rounded-xl shadow-sm"><i class="fas fa-inbox text-6xl text-gray-300 mb-4"></i><p class="text-xl text-gray-500">No campaigns</p></div>`;
+        return;
+    }
+    renderCampaigns(allCampaigns);
+    updateStats(allCampaigns);
+}
+
+// ===== RENDER =====
+function renderCampaigns(campaigns) {
+    const container = document.getElementById('campaigns-container');
+    if (campaigns.length === 0) {
+        container.innerHTML = `<div class="text-center py-12 bg-white rounded-xl shadow-sm"><i class="fas fa-search text-6xl text-gray-300 mb-4"></i><p class="text-xl text-gray-500">No campaigns in this category</p></div>`;
+        return;
+    }
+
+    container.innerHTML = campaigns.map(c => {
+        const progress = Math.min((c.raisedAmount / c.goalAmount) * 100, 100);
+        const days = Math.ceil((new Date(c.endDate) - new Date()) / (1000*60*60*24));
+        const urgent = days < 7 && days > 0;
+        const ended = days <= 0 && c.raisedAmount < c.goalAmount;
+        const funded = c.raisedAmount >= c.goalAmount;
+
+        return `
+        <div class="campaign-card bg-white rounded-xl shadow-sm overflow-hidden card-hover">
+            <div class="flex flex-col md:flex-row">
+                <img src="${c.imageUrl || 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=400&h=300&fit=crop'}" 
+                     class="campaign-image w-full md:w-48 h-48 object-cover" 
+                     onerror="this.src='https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=400&h=300&fit=crop'">
+                <div class="p-6 flex-1">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <span class="text-xs font-semibold text-purple-600 bg-purple-100 px-3 py-1 rounded-full">${c.category}</span>
+                            ${urgent ? '<span class="ml-2 text-xs text-red-600 bg-red-100 px-2 py-1 rounded-full"><i class="fas fa-clock mr-1"></i>Urgent</span>' : ''}
+                            ${funded ? '<span class="ml-2 text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full"><i class="fas fa-check mr-1"></i>Funded</span>' : ''}
+                            ${ended ? '<span class="ml-2 text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-full"><i class="fas fa-clock mr-1"></i>Ended</span>' : ''}
+                            ${isDemo ? '<span class="ml-2 text-xs bg-yellow-500 text-white px-2 py-1 rounded-full">Demo</span>' : ''}
+                        </div>
+                        <span class="text-xs text-gray-500">${new Date(c.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-800 mb-2">${c.title}</h3>
+                    <p class="text-sm text-gray-600 mb-3 line-clamp-2">${c.description}</p>
+                    <div class="mb-3">
+                        <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                            <div class="progress-bar bg-gradient-to-r from-purple-600 to-indigo-600 h-2 rounded-full" style="width: ${Math.min(progress,100)}%"></div>
+                        </div>
+                        <div class="flex justify-between text-sm mt-1">
+                            <span class="font-semibold text-gray-800">$${c.raisedAmount.toLocaleString()}</span>
+                            <span class="text-gray-500">${progress.toFixed(0)}% of $${c.goalAmount.toLocaleString()}</span>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <div class="text-sm text-gray-500">
+                            <i class="fas fa-user mr-1"></i>${c.creatorName}
+                            ${days > 0 ? `<span class="ml-2"><i class="far fa-clock mr-1"></i>${days}d left</span>` : ''}
+                            ${ended ? '<span class="ml-2 text-red-500">Ended</span>' : ''}
+                        </div>
+                        ${!ended ? `<button onclick="openDonation('${c._id}')" class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-full text-sm font-semibold hover:shadow-lg transition-all duration-200"><i class="fas fa-heart mr-1"></i>Donate</button>` : `<span class="text-gray-400 text-sm">Closed</span>`}
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ===== FILTER =====
+function filterCampaigns(category) {
+    currentFilter = category;
+    document.querySelectorAll('.filter-btn').forEach(b => {
+        b.classList.remove('bg-purple-600', 'text-white');
+        b.classList.add('bg-gray-200', 'text-gray-700');
+    });
+    const active = document.querySelector(`.filter-btn[data-filter="${category}"]`);
+    if (active) { active.classList.remove('bg-gray-200', 'text-gray-700'); active.classList.add('bg-purple-600', 'text-white'); }
+    
+    const filtered = category === 'all' ? allCampaigns : allCampaigns.filter(c => c.category === category);
+    renderCampaigns(filtered);
+}
+
+// ===== STATS =====
+function updateStats(campaigns) {
+    const total = campaigns.reduce((s, c) => s + c.raisedAmount, 0);
+    const donors = campaigns.reduce((s, c) => s + (c.donations ? c.donations.length : 0), 0);
+    const success = campaigns.filter(c => c.raisedAmount >= c.goalAmount).length;
+    const rate = campaigns.length > 0 ? (success / campaigns.length * 100) : 0;
+    document.getElementById('total-raised').textContent = `$${total.toLocaleString()}`;
+    document.getElementById('total-campaigns').textContent = campaigns.length;
+    document.getElementById('total-donors').textContent = donors;
+    document.getElementById('success-rate').textContent = `${rate.toFixed(0)}%`;
+}
+
+// ===== OPEN DONATION =====
+async function openDonation(id) {
+    currentCampaignId = id;
+    currentCampaignData = null;
+    document.getElementById('d-title').textContent = 'Loading...';
+    document.getElementById('d-goal').textContent = 'Loading...';
+    document.getElementById('d-raised').textContent = 'Loading...';
+    document.getElementById('donation-modal').classList.remove('hidden');
+    document.getElementById('donation-form').reset();
+    document.querySelectorAll('.quick-amount').forEach(b => b.classList.remove('active'));
+
+    try {
+        let camp;
+        if (id.toString().startsWith('demo')) {
+            camp = DEMO_CAMPAIGNS.find(c => c._id === id);
+        } else {
+            const res = await fetch(`${API_URL}/campaign/${id}`);
+            if (!res.ok) throw new Error('Not found');
+            camp = await res.json();
+        }
+        if (camp) {
+            currentCampaignData = camp;
+            document.getElementById('d-title').textContent = camp.title;
+            document.getElementById('d-goal').textContent = `$${camp.goalAmount.toLocaleString()}`;
+            document.getElementById('d-raised').textContent = `$${camp.raisedAmount.toLocaleString()}`;
+        }
+    } catch (e) {
+        document.getElementById('d-title').textContent = 'Error loading';
+        showToast('Error loading campaign', 'error');
+    }
+}
+
+// ===== CLOSE DONATION =====
+function closeDonationModal() {
+    document.getElementById('donation-modal').classList.add('hidden');
+    document.getElementById('donation-form').reset();
+    document.querySelectorAll('.quick-amount').forEach(b => b.classList.remove('active'));
+}
+
+// ===== CREATE CAMPAIGN =====
+document.getElementById('create-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Submitting...';
+
+    const data = {
+        title: document.getElementById('c-title').value.trim(),
+        category: document.getElementById('c-category').value,
+        description: document.getElementById('c-description').value.trim(),
+        goalAmount: parseFloat(document.getElementById('c-goal').value),
+        imageUrl: document.getElementById('c-image').value.trim(),
+        creatorName: document.getElementById('c-name').value.trim(),
+        creatorEmail: document.getElementById('c-email').value.trim(),
+        creatorWallet: document.getElementById('c-wallet').value.trim(),
+        endDate: document.getElementById('c-enddate').value
+    };
+
+    if (!data.creatorWallet.startsWith('0x') || data.creatorWallet.length !== 42) {
+        showToast('Invalid wallet address (0x...)', 'error');
+        btn.disabled = false; btn.innerHTML = orig; return;
+    }
+    if (data.goalAmount < 10) { showToast('Goal must be at least $10', 'error'); btn.disabled = false; btn.innerHTML = orig; return; }
+
+    try {
+        const res = await fetch(`${API_URL}/campaigns`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Failed');
+        showToast('✅ Campaign created! Under review.', 'success');
+        document.getElementById('create-modal').classList.add('hidden');
+        document.getElementById('create-form').reset();
+        loadCampaigns();
+    } catch (err) {
+        showToast('❌ ' + err.message, 'error');
+    }
+    btn.disabled = false; btn.innerHTML = orig;
+});
+
+// ===== DONATION FORM - UPDATED WITH SECURE WIDGET =====
+document.getElementById('donation-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    if (!currentCampaignData) {
+        showToast('Loading campaign data...', 'warning');
+        return;
+    }
+    if (!currentCampaignData.creatorWallet) {
+        showToast('Wallet address not found', 'error');
+        return;
+    }
+
+    const amount = parseFloat(document.getElementById('d-amount').value);
+    if (!amount || amount < 1) { 
+        showToast('Enter valid amount (min $1)', 'error'); 
+        return; 
+    }
+
+    const btn = document.getElementById('donate-btn');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing...';
+
+    try {
+        if (selectedGateway === 'Transak') {
+            // Use Secure Widget URL from backend
+            const response = await fetch(`${API_URL}/transak/widget-url`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amount: amount,
+                    walletAddress: currentCampaignData.creatorWallet,
+                    orderId: `donation_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+                    campaignId: currentCampaignId,
+                    donorName: document.getElementById('d-name').value || 'Donor',
+                    donorEmail: document.getElementById('d-email').value || ''
+                })
+            });
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Failed to generate payment URL');
+
+            closeDonationModal();
+            
+            const w = 600, h = 700;
+            const left = window.screenX + (window.outerWidth - w) / 2;
+            const top = window.screenY + (window.outerHeight - h) / 2;
+            const win = window.open(
+                data.paymentUrl, 
+                'Transak', 
+                `width=${w},height=${h},left=${left},top=${top},menubar=0,toolbar=0,location=0,status=0,scrollbars=1`
+            );
+            
+            if (win) {
+                showToast('💳 Transak opened', 'success');
+                // Refresh campaigns after payment
+                setTimeout(() => {
+                    loadCampaigns();
+                    showToast('🔄 Campaigns updated', 'success');
+                }, 25000);
+            } else {
+                showToast('⚠️ Please allow popups', 'warning');
+                // Show fallback link
+                showToast(`📋 Click here if window doesn't open: ${data.paymentUrl}`, 'info');
+            }
+        } else {
+            // MoonPay or Ramp via server
+            const res = await fetch(`${API_URL}/payment/intent`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    campaignId: currentCampaignId,
+                    amount,
+                    gateway: selectedGateway,
+                    donorName: document.getElementById('d-name').value || 'Anonymous',
+                    donorEmail: document.getElementById('d-email').value || ''
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Payment failed');
+            
+            closeDonationModal();
+            const w = 600, h = 700;
+            const left = window.screenX + (window.outerWidth - w) / 2;
+            const top = window.screenY + (window.outerHeight - h) / 2;
+            const win = window.open(data.paymentUrl, selectedGateway, `width=${w},height=${h},left=${left},top=${top},menubar=0,toolbar=0,location=0,status=0,scrollbars=1`);
+            if (win) { 
+                showToast(`💳 ${selectedGateway} opened`, 'success'); 
+                setTimeout(loadCampaigns, 20000); 
+            } else { 
+                showToast('⚠️ Please allow popups', 'warning'); 
+            }
+        }
+    } catch (err) {
+        console.error('Payment error:', err);
+        showToast('❌ ' + err.message, 'error');
+    }
+    btn.disabled = false;
+    btn.innerHTML = orig;
+});
+
+// ===== CLOSE MODALS =====
+document.querySelectorAll('.modal-overlay').forEach(m => {
+    m.addEventListener('click', (e) => { if (e.target === m) m.classList.add('hidden'); });
+});
+
+// ===== KEYBOARD SHORTCUTS =====
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') document.querySelectorAll('.fixed.inset-0:not(.hidden)').forEach(m => m.classList.add('hidden'));
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); document.getElementById('create-modal').classList.remove('hidden'); }
+});
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded', () => {
+    loadCampaigns();
+    selectGateway('Transak');
+    const dateInput = document.getElementById('c-enddate');
+    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+    dateInput.min = tomorrow.toISOString().split('T')[0];
+    const thirty = new Date(); thirty.setDate(thirty.getDate() + 30);
+    dateInput.value = thirty.toISOString().split('T')[0];
+});
+
+console.log('🚀 FundBridge 100% Live with Secure Transak Widget!');
+</script>
+</body>
+</html>
