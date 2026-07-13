@@ -44,14 +44,15 @@ const campaignSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
   category: { type: String, required: true, enum: ['Medical', 'Education', 'Business', 'Charity', 'Emergency', 'Other'] },
   description: { type: String, required: true },
-  targetAmount: { type: Number, required: true, min: 10 },
+  targetAmount: { type: Number, default: 1000 },
+  goalAmount: { type: Number, default: 1000 }, // For backward compatibility
   raisedAmount: { type: Number, default: 0 },
   imageUrl: { type: String, required: true },
   videoUrl: { type: String, default: '' },
   creatorName: { type: String, required: true },
   creatorEmail: { type: String, required: true },
   creatorWallet: { type: String, required: true },
-  status: { type: String, enum: ['Pending', 'Active', 'Rejected', 'Completed'], default: 'Pending' },
+  status: { type: String, enum: ['Pending', 'Active', 'Rejected', 'Completed', 'pending', 'active', 'rejected', 'completed'], default: 'Pending' },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
   endDate: { type: Date, required: true },
@@ -173,8 +174,23 @@ app.post('/api/admin/login', async (req, res) => {
 
 app.get('/api/admin/pending-campaigns', authenticateAdmin, async (req, res) => {
   try {
-    const campaigns = await Campaign.find({ status: 'Pending' }).sort({ createdAt: -1 });
-    res.json(campaigns);
+    const campaigns = await Campaign.find({ 
+      status: { $in: ['Pending', 'pending'] } 
+    }).sort({ createdAt: -1 });
+    
+    // Fix old campaigns
+    const fixed = campaigns.map(c => {
+      const obj = c.toObject ? c.toObject() : c;
+      if (!obj.targetAmount) {
+        obj.targetAmount = obj.goalAmount || 1000;
+      }
+      if (!obj.raisedAmount) {
+        obj.raisedAmount = 0;
+      }
+      return obj;
+    });
+    
+    res.json(fixed);
   } catch (error) {
     console.error('Error fetching pending campaigns:', error);
     res.status(500).json({ error: 'Server error' });
@@ -184,7 +200,20 @@ app.get('/api/admin/pending-campaigns', authenticateAdmin, async (req, res) => {
 app.get('/api/admin/all-campaigns', authenticateAdmin, async (req, res) => {
   try {
     const campaigns = await Campaign.find().sort({ createdAt: -1 });
-    res.json(campaigns);
+    
+    // Fix old campaigns
+    const fixed = campaigns.map(c => {
+      const obj = c.toObject ? c.toObject() : c;
+      if (!obj.targetAmount) {
+        obj.targetAmount = obj.goalAmount || 1000;
+      }
+      if (!obj.raisedAmount) {
+        obj.raisedAmount = 0;
+      }
+      return obj;
+    });
+    
+    res.json(fixed);
   } catch (error) {
     console.error('Error fetching all campaigns:', error);
     res.status(500).json({ error: 'Server error' });
@@ -197,7 +226,7 @@ app.put('/api/admin/approve-campaign/:id', authenticateAdmin, async (req, res) =
     if (!campaign) {
       return res.status(404).json({ error: 'Campaign not found' });
     }
-    if (campaign.status !== 'Pending') {
+    if (campaign.status !== 'Pending' && campaign.status !== 'pending') {
       return res.status(400).json({ error: 'Campaign is not pending' });
     }
     campaign.status = 'Active';
@@ -216,7 +245,7 @@ app.put('/api/admin/reject-campaign/:id', authenticateAdmin, async (req, res) =>
     if (!campaign) {
       return res.status(404).json({ error: 'Campaign not found' });
     }
-    if (campaign.status !== 'Pending') {
+    if (campaign.status !== 'Pending' && campaign.status !== 'pending') {
       return res.status(400).json({ error: 'Campaign is not pending' });
     }
     campaign.status = 'Rejected';
@@ -246,26 +275,65 @@ app.delete('/api/admin/delete-campaign/:id', authenticateAdmin, async (req, res)
 
 // ========== PUBLIC ROUTES ==========
 
+// ===== GET ACTIVE CAMPAIGNS (WITH FALLBACK FOR OLD CAMPAIGNS) =====
 app.get('/api/campaigns', async (req, res) => {
   try {
-    const campaigns = await Campaign.find({ status: 'Active' }).sort({ createdAt: -1 });
-    res.json(campaigns);
+    const campaigns = await Campaign.find({ 
+      status: { $in: ['Active', 'active'] } 
+    }).sort({ createdAt: -1 });
+    
+    // Fix: Ensure targetAmount exists for old campaigns
+    const fixedCampaigns = campaigns.map(c => {
+      const obj = c.toObject ? c.toObject() : c;
+      
+      // If targetAmount doesn't exist, use goalAmount or default
+      if (!obj.targetAmount && obj.goalAmount) {
+        obj.targetAmount = obj.goalAmount;
+      }
+      if (!obj.targetAmount) {
+        obj.targetAmount = 1000; // Default fallback
+      }
+      
+      // Ensure raisedAmount exists
+      if (!obj.raisedAmount) {
+        obj.raisedAmount = 0;
+      }
+      
+      return obj;
+    });
+    
+    res.json(fixedCampaigns);
   } catch (error) {
     console.error('Error fetching campaigns:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
+// ===== GET SINGLE CAMPAIGN (WITH FALLBACK FOR OLD CAMPAIGNS) =====
 app.get('/api/campaign/:id', async (req, res) => {
   try {
     const campaign = await Campaign.findById(req.params.id);
     if (!campaign) {
       return res.status(404).json({ error: 'Campaign not found' });
     }
-    if (campaign.status !== 'Active' && campaign.status !== 'Pending') {
+    if (campaign.status !== 'Active' && campaign.status !== 'active' && campaign.status !== 'Pending' && campaign.status !== 'pending') {
       return res.status(403).json({ error: 'Campaign not available' });
     }
-    res.json(campaign);
+    
+    const obj = campaign.toObject ? campaign.toObject() : campaign;
+    
+    // Fix: Ensure targetAmount exists
+    if (!obj.targetAmount && obj.goalAmount) {
+      obj.targetAmount = obj.goalAmount;
+    }
+    if (!obj.targetAmount) {
+      obj.targetAmount = 1000;
+    }
+    if (!obj.raisedAmount) {
+      obj.raisedAmount = 0;
+    }
+    
+    res.json(obj);
   } catch (error) {
     console.error('Error fetching campaign:', error);
     res.status(500).json({ error: 'Server error' });
@@ -297,6 +365,7 @@ app.post('/api/campaigns', async (req, res) => {
       category,
       description,
       targetAmount,
+      goalAmount: targetAmount,
       imageUrl,
       videoUrl: videoUrl || '',
       creatorName,
@@ -327,7 +396,7 @@ app.post('/api/payment/intent', async (req, res) => {
       return res.status(404).json({ error: 'Campaign not found' });
     }
 
-    if (campaign.status !== 'Active') {
+    if (campaign.status !== 'Active' && campaign.status !== 'active') {
       return res.status(400).json({ error: 'Campaign is not active' });
     }
 
